@@ -26,8 +26,8 @@ export default function Dashboard() {
   const alertMembers = members.filter(m => m.missingPlanned);
   const showAlert = data?.is_past_deadline && alertMembers.length > 0;
 
-  const totalPlanned     = members.reduce((s, m) => s + (m.planned_hours ?? 0), 0);
-  const totalActual      = members.reduce((s, m) => s + (m.actual_hours  ?? 0), 0);
+  const totalPlanned     = members.reduce((s, m) => s + Number(m.planned_hours ?? 0), 0);
+  const totalActual      = members.reduce((s, m) => s + Number(m.actual_hours  ?? 0), 0);
   const totalPlannedCost = members.reduce((s, m) => s + (m.planned_cost  ?? 0), 0);
   const totalActualCost  = members.reduce((s, m) => s + (m.actual_cost   ?? 0), 0);
 
