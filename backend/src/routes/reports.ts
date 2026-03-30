@@ -35,12 +35,20 @@ router.get('/monthly', async (req, res, next) => {
       [year, month]
     );
 
-    const members = rows.map(row => ({
-      ...row,
-      missingPlanned: isPastDeadline && row.planned_hours === null,
-      planned_cost: row.planned_hours !== null ? Number(row.planned_hours) * Number(row.unit_cost) : null,
-      actual_cost:  row.actual_hours  !== null ? Number(row.actual_hours)  * Number(row.unit_cost) : null,
-    }));
+    const members = rows.map(row => {
+      const planned = row.planned_hours !== null ? Number(row.planned_hours) : null;
+      const actual  = row.actual_hours  !== null ? Number(row.actual_hours)  : null;
+      const unitCost = Number(row.unit_cost);
+      return {
+        ...row,
+        planned_hours: planned,
+        actual_hours:  actual,
+        unit_cost:     unitCost,
+        missingPlanned: isPastDeadline && planned === null,
+        planned_cost: planned !== null ? planned * unitCost : null,
+        actual_cost:  actual  !== null ? actual  * unitCost : null,
+      };
+    });
 
     res.json({ year, month, deadline_day: deadlineDay, is_past_deadline: isPastDeadline, members });
   } catch (err) {
