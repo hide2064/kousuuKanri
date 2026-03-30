@@ -38,6 +38,7 @@ router.post(
 
       let imported = 0;
       let skipped = 0;
+      let created = 0;
       const errors: ImportError[] = [];
 
       for (let i = 0; i < records.length; i++) {
@@ -68,9 +69,19 @@ router.post(
           }
 
           if (memberId === null) {
-            errors.push({ row: rowNum, reason: `メンバーが見つかりません: code="${code}" name="${name}"`, data: row });
-            skipped++;
-            continue;
+            // メンバーが存在しない場合は新規登録
+            if (!name) {
+              errors.push({ row: rowNum, reason: `メンバーが見つかりません（コードと名前の両方が未指定）`, data: row });
+              skipped++;
+              continue;
+            }
+            const newCode = code || name;
+            const [result] = await pool.query<import('mysql2').ResultSetHeader>(
+              'INSERT INTO members (code, name, unit_cost) VALUES (?, ?, 0)',
+              [newCode, name]
+            );
+            memberId = result.insertId;
+            created++;
           }
 
           const year  = parseInt(row['year']  ?? row['年']  ?? row['年度'] ?? '');
@@ -120,7 +131,7 @@ router.post(
         }
       }
 
-      res.json({ total: records.length, imported, skipped, errors });
+      res.json({ total: records.length, imported, skipped, created, errors });
     } catch (err) {
       next(err);
     }
