@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client';
 import type { MonthlyMemberRow } from '../types';
+import WorkHoursChart from '../components/WorkHoursChart';
 
 function fmt(n: number | null, digits = 1) {
   if (n === null) return '—';
@@ -12,6 +13,14 @@ function fmtCost(n: number | null) {
   return n.toLocaleString('ja-JP') + ' 円';
 }
 
+/** 選択月を終点とした過去6ヶ月（含む）の年月リストを返す */
+function getPast6Months(year: number, month: number) {
+  return Array.from({ length: 6 }, (_, i) => {
+    const d = new Date(year, month - 1 - (5 - i));
+    return { year: d.getFullYear(), month: d.getMonth() + 1 };
+  });
+}
+
 export default function Dashboard() {
   const now = new Date();
   const [year,  setYear]  = useState(now.getFullYear());
@@ -20,6 +29,27 @@ export default function Dashboard() {
   const { data, isLoading, error } = useQuery({
     queryKey: ['monthly-report', year, month],
     queryFn: () => api.getMonthlyReport(year, month),
+  });
+
+  const trendMonths = getPast6Months(year, month);
+
+  const { data: trendData = [] } = useQuery({
+    queryKey: ['trend', year, month],
+    queryFn: async () => {
+      const results = await Promise.allSettled(
+        trendMonths.map(m => api.getMonthlyReport(m.year, m.month))
+      );
+      return results
+        .flatMap((r, i) => {
+          if (r.status !== 'fulfilled') return [];
+          const { year: y, month: mo } = trendMonths[i];
+          return [{
+            month: `${y}/${String(mo).padStart(2, '0')}`,
+            planned: r.value.members.reduce((s, m) => s + Number(m.planned_hours ?? 0), 0),
+            actual:  r.value.members.reduce((s, m) => s + Number(m.actual_hours  ?? 0), 0),
+          }];
+        });
+    },
   });
 
   const members = data?.members ?? [];
@@ -74,40 +104,48 @@ export default function Dashboard() {
         ))}
       </div>
 
-      {/* Table */}
-      <div className="card overflow-x-auto p-0">
-        {isLoading && <div className="p-6 text-gray-500">読み込み中...</div>}
-        {error   && <div className="p-6 text-red-600">エラー: {String(error)}</div>}
-        {!isLoading && !error && (
-          <table className="table-base">
-            <thead>
-              <tr>
-                <th>コード</th>
-                <th>メンバー名</th>
-                <th className="text-right">予定工数(h)</th>
-                <th className="text-right">実績工数(h)</th>
-                <th className="text-right">差異(h)</th>
-                <th className="text-right">予定コスト</th>
-                <th className="text-right">実績コスト</th>
-              </tr>
-            </thead>
-            <tbody>
-              {members.map(row => (
-                <MemberRow key={row.id} row={row} isPastDeadline={data?.is_past_deadline ?? false} />
-              ))}
-            </tbody>
-            <tfoot>
-              <tr>
-                <td colSpan={2}>合計</td>
-                <td className="text-right">{fmt(totalPlanned)}</td>
-                <td className="text-right">{fmt(totalActual)}</td>
-                <td className="text-right">{fmt(totalActual - totalPlanned)}</td>
-                <td className="text-right">{totalPlannedCost.toLocaleString()} 円</td>
-                <td className="text-right">{totalActualCost.toLocaleString()} 円</td>
-              </tr>
-            </tfoot>
-          </table>
-        )}
+      {/* Chart + Table */}
+      <div className="flex gap-4 items-start">
+        {/* Left: Chart (60%) */}
+        <div className="flex-[3] min-w-0">
+          {isLoading && <div className="card p-6 text-gray-500">読み込み中...</div>}
+          {error     && <div className="card p-6 text-red-600">エラー: {String(error)}</div>}
+          {!isLoading && !error && data && (
+            <WorkHoursChart monthlyReport={data} trendData={trendData} />
+          )}
+        </div>
+
+        {/* Right: Table (40%) */}
+        <div className="flex-[2] min-w-0 card overflow-x-auto p-0">
+          {isLoading && <div className="p-6 text-gray-500">読み込み中...</div>}
+          {error     && <div className="p-6 text-red-600">エラー: {String(error)}</div>}
+          {!isLoading && !error && (
+            <table className="table-base">
+              <thead>
+                <tr>
+                  <th>コード</th>
+                  <th>メンバー名</th>
+                  <th className="text-right">予定(h)</th>
+                  <th className="text-right">実績(h)</th>
+                  <th className="text-right">差異(h)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {members.map(row => (
+                  <MemberRow key={row.id} row={row} isPastDeadline={data?.is_past_deadline ?? false} />
+                ))}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td colSpan={2}>合計</td>
+                  <td className="text-right">{fmt(totalPlanned)}</td>
+                  <td className="text-right">{fmt(totalActual)}</td>
+                  <td className="text-right">{fmt(totalActual - totalPlanned)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -128,8 +166,6 @@ function MemberRow({ row, isPastDeadline }: { row: MonthlyMemberRow; isPastDeadl
       <td className="text-right">{isAlert ? <span className="badge-red">未登録</span> : fmt(row.planned_hours)}</td>
       <td className="text-right">{fmt(row.actual_hours)}</td>
       <td className="text-right">{row.planned_hours !== null ? fmt(diff) : '—'}</td>
-      <td className="text-right">{fmtCost(row.planned_cost)}</td>
-      <td className="text-right">{fmtCost(row.actual_cost)}</td>
     </tr>
   );
 }
