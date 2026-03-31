@@ -45,7 +45,7 @@ export default function WorkHoursChart({ monthlyReport, trendData }: WorkHoursCh
       </div>
 
       {/* グラフ本体 */}
-      <div className="flex-1 min-h-0" style={{ minHeight: 240 }}>
+      <div>
         {chartType === 'bar'  && <BarChartView  report={monthlyReport} />}
         {chartType === 'line' && <LineChartView trendData={trendData} />}
         {chartType === 'pie'  && <PieChartView  report={monthlyReport} />}
@@ -67,7 +67,7 @@ function BarChartView({ report }: { report: MonthlyReport }) {
   }
 
   return (
-    <ResponsiveContainer width="100%" height="100%">
+    <ResponsiveContainer width="100%" height={300}>
       <BarChart data={data} margin={{ top: 4, right: 16, left: 0, bottom: 4 }}>
         <CartesianGrid strokeDasharray="3 3" />
         <XAxis dataKey="name" tick={{ fontSize: 12 }} />
@@ -94,7 +94,7 @@ function LineChartView({ trendData }: { trendData: { month: string; planned: num
   }));
 
   return (
-    <ResponsiveContainer width="100%" height="100%">
+    <ResponsiveContainer width="100%" height={300}>
       <LineChart data={data} margin={{ top: 4, right: 16, left: 0, bottom: 4 }}>
         <CartesianGrid strokeDasharray="3 3" />
         <XAxis dataKey="name" tick={{ fontSize: 11 }} />
@@ -119,7 +119,7 @@ function PieChartView({ report }: { report: MonthlyReport }) {
   }
 
   return (
-    <ResponsiveContainer width="100%" height="100%">
+    <ResponsiveContainer width="100%" height={300}>
       <PieChart>
         <Pie
           data={raw}
