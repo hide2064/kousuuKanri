@@ -31,18 +31,17 @@ export default function Dashboard() {
     queryFn: () => api.getMonthlyReport(year, month),
   });
 
-  const trendMonths = getPast6Months(year, month);
-
   const { data: trendData = [] } = useQuery({
     queryKey: ['trend', year, month],
     queryFn: async () => {
+      const months = getPast6Months(year, month);
       const results = await Promise.allSettled(
-        trendMonths.map(m => api.getMonthlyReport(m.year, m.month))
+        months.map(m => api.getMonthlyReport(m.year, m.month))
       );
       return results
         .flatMap((r, i) => {
           if (r.status !== 'fulfilled') return [];
-          const { year: y, month: mo } = trendMonths[i];
+          const { year: y, month: mo } = months[i];
           return [{
             month: `${y}/${String(mo).padStart(2, '0')}`,
             planned: r.value.members.reduce((s, m) => s + Number(m.planned_hours ?? 0), 0),
