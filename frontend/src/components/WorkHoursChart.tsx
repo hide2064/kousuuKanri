@@ -62,6 +62,10 @@ function BarChartView({ report }: { report: MonthlyReport }) {
     実績: Number(m.actual_hours  ?? 0),
   }));
 
+  if (data.length === 0) {
+    return <div className="flex items-center justify-center h-full text-gray-400 text-sm">データなし</div>;
+  }
+
   return (
     <ResponsiveContainer width="100%" height="100%">
       <BarChart data={data} margin={{ top: 4, right: 16, left: 0, bottom: 4 }}>
