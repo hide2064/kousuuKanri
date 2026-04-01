@@ -62,6 +62,18 @@ export const api = {
     return req<ImportResult>('/import/csv', { method: 'POST', body: form });
   },
 
+  importDepartmentsCsv: (file: File) => {
+    const form = new FormData();
+    form.append('file', file);
+    return req<ImportResult>('/import/departments', { method: 'POST', body: form });
+  },
+
+  importMembersCsv: (file: File) => {
+    const form = new FormData();
+    form.append('file', file);
+    return req<ImportResult>('/import/members', { method: 'POST', body: form });
+  },
+
   /* ---------- Departments ---------- */
   getDepartments: () => req<Department[]>('/departments'),
 
