@@ -182,12 +182,12 @@ export default function MembersPage() {
           <h3 className="font-semibold">新規メンバー</h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div>
-              <label className="block text-xs text-gray-500 mb-1">コード *</label>
+              <label className="block text-xs text-gray-500 mb-1">コード <span className="text-red-500">*</span></label>
               <input className="input w-full" value={newForm.code} placeholder="M001"
                 onChange={e => setNewForm(f => ({ ...f, code: e.target.value }))} />
             </div>
             <div>
-              <label className="block text-xs text-gray-500 mb-1">氏名 *</label>
+              <label className="block text-xs text-gray-500 mb-1">氏名 <span className="text-red-500">*</span></label>
               <input className="input w-full" value={newForm.name} placeholder="田中太郎"
                 onChange={e => setNewForm(f => ({ ...f, name: e.target.value }))} />
             </div>
@@ -213,7 +213,9 @@ export default function MembersPage() {
             </button>
           </div>
           {createMutation.isError && (
-            <p className="text-red-600 text-sm">{String(createMutation.error)}</p>
+            <p className="text-red-600 text-sm">
+              {createMutation.error instanceof Error ? createMutation.error.message : String(createMutation.error)}
+            </p>
           )}
         </div>
       )}

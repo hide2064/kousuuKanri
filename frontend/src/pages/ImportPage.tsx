@@ -108,7 +108,7 @@ export default function ImportPage() {
 
         {mutation.isError && (
           <div className="bg-red-50 border border-red-300 rounded-lg p-3 text-red-700 text-sm">
-            エラー: {String(mutation.error)}
+            エラー: {mutation.error instanceof Error ? mutation.error.message : String(mutation.error)}
           </div>
         )}
       </div>

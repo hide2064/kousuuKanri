@@ -27,14 +27,18 @@ function MonthlyTab({ year, month }: { year: number; month: number }) {
   const totalAC = members.reduce((s, m) => s + (m.actual_cost   ?? 0), 0);
 
   if (isLoading) return <p className="p-4 text-gray-500">読み込み中...</p>;
-  if (error)     return <p className="p-4 text-red-600">エラー: {String(error)}</p>;
+  if (error)     return <p className="p-4 text-red-600">エラー: {error instanceof Error ? error.message : String(error)}</p>;
 
   return (
     <div className="overflow-x-auto">
       {data?.is_past_deadline && members.some(m => m.missingPlanned) && (
-        <div className="m-4 bg-red-50 border border-red-300 rounded-lg px-4 py-2 text-red-700 text-sm">
-          締日（{data.deadline_day}日）超過 — 予定工数未登録：
-          {members.filter(m => m.missingPlanned).map(m => m.name).join('、')}
+        <div className="m-4 bg-red-50 border border-red-300 rounded-lg px-4 py-3 text-red-700 text-sm">
+          <p className="font-medium">締日（{data.deadline_day}日）超過 — 予定工数未登録</p>
+          <ul className="mt-1 list-disc list-inside space-y-0.5">
+            {members.filter(m => m.missingPlanned).map(m => (
+              <li key={m.id}>{m.name}</li>
+            ))}
+          </ul>
         </div>
       )}
       <table className="table-base">
@@ -93,7 +97,7 @@ function AnnualTab({ fiscalYear }: { fiscalYear: number }) {
   });
 
   if (isLoading) return <p className="p-4 text-gray-500">読み込み中...</p>;
-  if (error)     return <p className="p-4 text-red-600">エラー: {String(error)}</p>;
+  if (error)     return <p className="p-4 text-red-600">エラー: {error instanceof Error ? error.message : String(error)}</p>;
   if (!data)     return null;
 
   const labels = data.month_labels;
@@ -108,12 +112,12 @@ function AnnualTab({ fiscalYear }: { fiscalYear: number }) {
         <table className="table-base">
           <thead>
             <tr>
-              <th>メンバー名</th>
+              <th className="sticky left-0 z-10 bg-gray-100">メンバー名</th>
               {labels.map(l => <th key={l} className="text-center" colSpan={2}>{l}</th>)}
               <th className="text-right" colSpan={2}>合計</th>
             </tr>
             <tr>
-              <th></th>
+              <th className="sticky left-0 z-10 bg-gray-100"></th>
               {labels.map(l => (
                 <>
                   <th key={l + 'p'} className="text-right text-xs text-gray-400">予定</th>
@@ -139,7 +143,7 @@ function AnnualTab({ fiscalYear }: { fiscalYear: number }) {
 function AnnualRow({ member, showCost }: { member: AnnualMemberRow; showCost: boolean }) {
   return (
     <tr>
-      <td>{member.member_name}</td>
+      <td className="sticky left-0 z-10 bg-white">{member.member_name}</td>
       {member.months.map(m => (
         <>
           <td key={m.label + 'p'} className="text-right">{showCost ? fmtCost(m.planned_cost) : fmt(m.planned_hours)}</td>
@@ -166,7 +170,7 @@ function AnnualFooter({ members, showCost }: { members: AnnualMemberRow[]; showC
 
   return (
     <tr>
-      <td>合計</td>
+      <td className="sticky left-0 z-10 bg-gray-50">合計</td>
       {Array.from({ length: monthCount }, (_, i) => (
         <>
           <td key={i + 'p'} className="text-right">{showCost ? fmtCost(totalsP[i]) : fmt(totalsP[i])}</td>
@@ -187,7 +191,7 @@ function DeptTab({ year, month }: { year: number; month: number }) {
   });
 
   if (isLoading) return <p className="p-4 text-gray-500">読み込み中...</p>;
-  if (error)     return <p className="p-4 text-red-600">エラー: {String(error)}</p>;
+  if (error)     return <p className="p-4 text-red-600">エラー: {error instanceof Error ? error.message : String(error)}</p>;
 
   const summary: DepartmentSummary[] = data?.department_summary ?? [];
 

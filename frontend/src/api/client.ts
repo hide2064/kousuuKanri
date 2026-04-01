@@ -9,7 +9,12 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(BASE + path, init);
   if (!res.ok) {
     const text = await res.text().catch(() => res.statusText);
-    throw new Error(text || `HTTP ${res.status}`);
+    let message = text || `HTTP ${res.status}`;
+    try {
+      const body = JSON.parse(text);
+      if (body.error) message = body.error;
+    } catch { /* ignore */ }
+    throw new Error(message);
   }
   return res.json() as Promise<T>;
 }

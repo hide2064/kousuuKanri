@@ -35,7 +35,7 @@ function SystemConfigTab() {
   });
 
   if (isLoading) return <p className="p-4 text-gray-500">読み込み中...</p>;
-  if (error)     return <p className="p-4 text-red-600">エラー: {String(error)}</p>;
+  if (error)     return <p className="p-4 text-red-600">エラー: {error instanceof Error ? error.message : String(error)}</p>;
   if (!config)   return null;
 
   return (
@@ -103,7 +103,7 @@ function SystemConfigTab() {
       )}
       {updateMutation.isError && (
         <div className="bg-red-50 border border-red-300 rounded-lg px-4 py-2 text-red-700 text-sm">
-          エラー: {String(updateMutation.error)}
+          エラー: {updateMutation.error instanceof Error ? updateMutation.error.message : String(updateMutation.error)}
         </div>
       )}
       <div className="card bg-blue-50 border-blue-200 text-sm text-blue-800 space-y-1">
