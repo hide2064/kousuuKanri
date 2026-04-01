@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client';
-import type { MonthlyMemberRow, AnnualMemberRow } from '../types';
+import type { MonthlyMemberRow, AnnualMemberRow, DepartmentSummary } from '../types';
 
-type Tab = 'monthly' | 'annual';
+type Tab = 'monthly' | 'annual' | 'dept';
 
 function fmt(n: number | null, digits = 1) {
   if (n === null) return '—';
@@ -21,10 +21,10 @@ function MonthlyTab({ year, month }: { year: number; month: number }) {
     queryFn: () => api.getMonthlyReport(year, month),
   });
   const members = data?.members ?? [];
-  const totalP = members.reduce((s, m) => s + (m.planned_hours ?? 0), 0);
-  const totalA = members.reduce((s, m) => s + (m.actual_hours  ?? 0), 0);
-  const totalPC = members.reduce((s, m) => s + (m.planned_cost ?? 0), 0);
-  const totalAC = members.reduce((s, m) => s + (m.actual_cost  ?? 0), 0);
+  const totalP  = members.reduce((s, m) => s + (m.planned_hours ?? 0), 0);
+  const totalA  = members.reduce((s, m) => s + (m.actual_hours  ?? 0), 0);
+  const totalPC = members.reduce((s, m) => s + (m.planned_cost  ?? 0), 0);
+  const totalAC = members.reduce((s, m) => s + (m.actual_cost   ?? 0), 0);
 
   if (isLoading) return <p className="p-4 text-gray-500">読み込み中...</p>;
   if (error)     return <p className="p-4 text-red-600">エラー: {String(error)}</p>;
@@ -87,7 +87,6 @@ function MonthlyRow({ row, pastDeadline }: { row: MonthlyMemberRow; pastDeadline
 /* ── Annual tab ── */
 function AnnualTab({ fiscalYear }: { fiscalYear: number }) {
   const [showCost, setShowCost] = useState(false);
-
   const { data, isLoading, error } = useQuery({
     queryKey: ['annual-report', fiscalYear],
     queryFn: () => api.getAnnualReport(fiscalYear),
@@ -102,23 +101,15 @@ function AnnualTab({ fiscalYear }: { fiscalYear: number }) {
   return (
     <div>
       <div className="p-4 flex gap-2">
-        <button
-          className={`btn ${!showCost ? 'btn-primary' : 'btn-secondary'}`}
-          onClick={() => setShowCost(false)}
-        >工数表示</button>
-        <button
-          className={`btn ${showCost ? 'btn-primary' : 'btn-secondary'}`}
-          onClick={() => setShowCost(true)}
-        >コスト表示</button>
+        <button className={`btn ${!showCost ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setShowCost(false)}>工数表示</button>
+        <button className={`btn ${showCost ? 'btn-primary' : 'btn-secondary'}`}  onClick={() => setShowCost(true)}>コスト表示</button>
       </div>
       <div className="overflow-x-auto">
         <table className="table-base">
           <thead>
             <tr>
               <th>メンバー名</th>
-              {labels.map(l => (
-                <th key={l} className="text-center" colSpan={2}>{l}</th>
-              ))}
+              {labels.map(l => <th key={l} className="text-center" colSpan={2}>{l}</th>)}
               <th className="text-right" colSpan={2}>合計</th>
             </tr>
             <tr>
@@ -134,9 +125,7 @@ function AnnualTab({ fiscalYear }: { fiscalYear: number }) {
             </tr>
           </thead>
           <tbody>
-            {data.members.map(member => (
-              <AnnualRow key={member.member_id} member={member} showCost={showCost} />
-            ))}
+            {data.members.map(member => <AnnualRow key={member.member_id} member={member} showCost={showCost} />)}
           </tbody>
           <tfoot>
             <AnnualFooter members={data.members} showCost={showCost} />
@@ -153,20 +142,12 @@ function AnnualRow({ member, showCost }: { member: AnnualMemberRow; showCost: bo
       <td>{member.member_name}</td>
       {member.months.map(m => (
         <>
-          <td key={m.label + 'p'} className="text-right">
-            {showCost ? fmtCost(m.planned_cost) : fmt(m.planned_hours)}
-          </td>
-          <td key={m.label + 'a'} className="text-right">
-            {showCost ? fmtCost(m.actual_cost) : fmt(m.actual_hours)}
-          </td>
+          <td key={m.label + 'p'} className="text-right">{showCost ? fmtCost(m.planned_cost) : fmt(m.planned_hours)}</td>
+          <td key={m.label + 'a'} className="text-right">{showCost ? fmtCost(m.actual_cost)  : fmt(m.actual_hours)}</td>
         </>
       ))}
-      <td className="text-right font-medium">
-        {showCost ? fmtCost(member.total_planned_cost) : fmt(member.total_planned_hours)}
-      </td>
-      <td className="text-right font-medium">
-        {showCost ? fmtCost(member.total_actual_cost) : fmt(member.total_actual_hours)}
-      </td>
+      <td className="text-right font-medium">{showCost ? fmtCost(member.total_planned_cost)  : fmt(member.total_planned_hours)}</td>
+      <td className="text-right font-medium">{showCost ? fmtCost(member.total_actual_cost)   : fmt(member.total_actual_hours)}</td>
     </tr>
   );
 }
@@ -175,23 +156,13 @@ function AnnualFooter({ members, showCost }: { members: AnnualMemberRow[]; showC
   if (!members.length) return null;
   const monthCount = members[0].months.length;
   const totalsP = members[0].months.map((_, mi) =>
-    members.reduce((s, mem) => {
-      const v = showCost ? mem.months[mi].planned_cost : mem.months[mi].planned_hours;
-      return s + (v ?? 0);
-    }, 0)
+    members.reduce((s, mem) => s + ((showCost ? mem.months[mi].planned_cost : mem.months[mi].planned_hours) ?? 0), 0)
   );
   const totalsA = members[0].months.map((_, mi) =>
-    members.reduce((s, mem) => {
-      const v = showCost ? mem.months[mi].actual_cost : mem.months[mi].actual_hours;
-      return s + (v ?? 0);
-    }, 0)
+    members.reduce((s, mem) => s + ((showCost ? mem.months[mi].actual_cost : mem.months[mi].actual_hours) ?? 0), 0)
   );
-  const grandP = showCost
-    ? members.reduce((s, m) => s + m.total_planned_cost, 0)
-    : members.reduce((s, m) => s + m.total_planned_hours, 0);
-  const grandA = showCost
-    ? members.reduce((s, m) => s + m.total_actual_cost, 0)
-    : members.reduce((s, m) => s + m.total_actual_hours, 0);
+  const grandP = showCost ? members.reduce((s, m) => s + m.total_planned_cost, 0)  : members.reduce((s, m) => s + m.total_planned_hours, 0);
+  const grandA = showCost ? members.reduce((s, m) => s + m.total_actual_cost, 0)   : members.reduce((s, m) => s + m.total_actual_hours, 0);
 
   return (
     <tr>
@@ -208,6 +179,67 @@ function AnnualFooter({ members, showCost }: { members: AnnualMemberRow[]; showC
   );
 }
 
+/* ── Dept/Section tab ── */
+function DeptTab({ year, month }: { year: number; month: number }) {
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['monthly-report', year, month],
+    queryFn: () => api.getMonthlyReport(year, month),
+  });
+
+  if (isLoading) return <p className="p-4 text-gray-500">読み込み中...</p>;
+  if (error)     return <p className="p-4 text-red-600">エラー: {String(error)}</p>;
+
+  const summary: DepartmentSummary[] = data?.department_summary ?? [];
+
+  if (summary.length === 0) {
+    return <p className="p-4 text-gray-400">部・課が設定されていないか、データがありません。</p>;
+  }
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="table-base">
+        <thead>
+          <tr>
+            <th>部</th>
+            <th>課</th>
+            <th className="text-right">メンバー数</th>
+            <th className="text-right">予定工数(h)</th>
+            <th className="text-right">実績工数(h)</th>
+            <th className="text-right">予定コスト(円)</th>
+            <th className="text-right">実績コスト(円)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {summary.map(dept => (
+            <>
+              <tr key={dept.department_id} className="bg-gray-50 font-medium">
+                <td>{dept.department_name}</td>
+                <td className="text-gray-500 text-xs">合計</td>
+                <td className="text-right">{dept.member_count}</td>
+                <td className="text-right">{fmt(dept.total_planned_hours)}</td>
+                <td className="text-right">{fmt(dept.total_actual_hours)}</td>
+                <td className="text-right">{dept.total_planned_cost.toLocaleString()}</td>
+                <td className="text-right">{dept.total_actual_cost.toLocaleString()}</td>
+              </tr>
+              {dept.sections.map(sec => (
+                <tr key={sec.section_id}>
+                  <td></td>
+                  <td className="pl-4 text-gray-700">{sec.section_name}</td>
+                  <td className="text-right">{sec.member_count}</td>
+                  <td className="text-right">{fmt(sec.total_planned_hours)}</td>
+                  <td className="text-right">{fmt(sec.total_actual_hours)}</td>
+                  <td className="text-right">{sec.total_planned_cost.toLocaleString()}</td>
+                  <td className="text-right">{sec.total_actual_cost.toLocaleString()}</td>
+                </tr>
+              ))}
+            </>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 /* ── Page ── */
 export default function ReportPage() {
   const now = new Date();
@@ -215,6 +247,8 @@ export default function ReportPage() {
   const [year,       setYear]       = useState(now.getFullYear());
   const [month,      setMonth]      = useState(now.getMonth() + 1);
   const [fiscalYear, setFiscalYear] = useState(now.getFullYear());
+  const [deptYear,   setDeptYear]   = useState(now.getFullYear());
+  const [deptMonth,  setDeptMonth]  = useState(now.getMonth() + 1);
 
   const yearOptions = [now.getFullYear() - 1, now.getFullYear(), now.getFullYear() + 1];
 
@@ -222,9 +256,8 @@ export default function ReportPage() {
     <div className="space-y-4">
       <h2 className="text-xl font-bold text-gray-800">工数レポート</h2>
 
-      {/* Tabs */}
       <div className="flex gap-1 border-b border-gray-200">
-        {(['monthly', 'annual'] as Tab[]).map(t => (
+        {([['monthly', '月次'], ['annual', '年次'], ['dept', '部・課別']] as [Tab, string][]).map(([t, label]) => (
           <button
             key={t}
             className={`px-5 py-2.5 text-sm font-medium border-b-2 transition-colors ${
@@ -234,14 +267,13 @@ export default function ReportPage() {
             }`}
             onClick={() => setTab(t)}
           >
-            {t === 'monthly' ? '月次' : '年次'}
+            {label}
           </button>
         ))}
       </div>
 
-      {/* Filters */}
       <div className="flex items-center gap-2">
-        {tab === 'monthly' ? (
+        {tab === 'monthly' && (
           <>
             <select className="select" value={year}  onChange={e => setYear(Number(e.target.value))}>
               {yearOptions.map(y => <option key={y} value={y}>{y}年</option>)}
@@ -252,19 +284,30 @@ export default function ReportPage() {
               ))}
             </select>
           </>
-        ) : (
+        )}
+        {tab === 'annual' && (
           <select className="select" value={fiscalYear} onChange={e => setFiscalYear(Number(e.target.value))}>
             {yearOptions.map(y => <option key={y} value={y}>{y}年度</option>)}
           </select>
         )}
+        {tab === 'dept' && (
+          <>
+            <select className="select" value={deptYear}  onChange={e => setDeptYear(Number(e.target.value))}>
+              {yearOptions.map(y => <option key={y} value={y}>{y}年</option>)}
+            </select>
+            <select className="select" value={deptMonth} onChange={e => setDeptMonth(Number(e.target.value))}>
+              {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
+                <option key={m} value={m}>{m}月</option>
+              ))}
+            </select>
+          </>
+        )}
       </div>
 
-      {/* Content */}
       <div className="card p-0 overflow-hidden">
-        {tab === 'monthly'
-          ? <MonthlyTab year={year} month={month} />
-          : <AnnualTab fiscalYear={fiscalYear} />
-        }
+        {tab === 'monthly' && <MonthlyTab year={year} month={month} />}
+        {tab === 'annual'  && <AnnualTab fiscalYear={fiscalYear} />}
+        {tab === 'dept'    && <DeptTab year={deptYear} month={deptMonth} />}
       </div>
     </div>
   );
