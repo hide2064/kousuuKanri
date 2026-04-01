@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS sections (
   name          VARCHAR(100)  NOT NULL,
   created_at    DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at    DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_sections_department_id (department_id),
   FOREIGN KEY (department_id) REFERENCES departments(id)
 );
 
@@ -27,6 +28,7 @@ CREATE TABLE IF NOT EXISTS members (
   active     TINYINT(1)    NOT NULL DEFAULT 1 COMMENT '在籍フラグ',
   created_at DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_members_section_id (section_id),
   FOREIGN KEY (section_id) REFERENCES sections(id)
 );
 
@@ -41,12 +43,13 @@ CREATE TABLE IF NOT EXISTS work_hours (
   created_at    DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at    DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE KEY uq_member_ym (member_id, year, month),
+  INDEX idx_work_hours_ym (year, month),
   FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS config (
   config_key   VARCHAR(100) NOT NULL PRIMARY KEY,
-  config_value TEXT         NOT NULL,
+  config_value VARCHAR(255) NOT NULL,
   description  VARCHAR(255) DEFAULT NULL,
   updated_at   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
