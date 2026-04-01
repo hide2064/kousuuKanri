@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { RowDataPacket } from 'mysql2';
 import pool from '../db';
+import type { DepartmentSummary, SectionSummary } from '../types';
 
 const router = Router();
 
@@ -26,9 +27,13 @@ router.get('/monthly', async (req, res, next) => {
       (today.getFullYear() === year && today.getMonth() + 1 === month && today.getDate() >= deadlineDay);
 
     const [rows] = await pool.query<RowDataPacket[]>(
-      `SELECT m.id, m.code, m.name, m.unit_cost,
+      `SELECT m.id, m.code, m.name, m.unit_cost, m.section_id,
+              s.name AS section_name, s.department_id,
+              d.name AS department_name,
               wh.planned_hours, wh.actual_hours, wh.note
        FROM members m
+       LEFT JOIN sections s ON s.id = m.section_id
+       LEFT JOIN departments d ON d.id = s.department_id
        LEFT JOIN work_hours wh ON wh.member_id = m.id AND wh.year = ? AND wh.month = ?
        WHERE m.active = 1
        ORDER BY m.name`,
@@ -36,21 +41,93 @@ router.get('/monthly', async (req, res, next) => {
     );
 
     const members = rows.map(row => {
-      const planned = row.planned_hours !== null ? Number(row.planned_hours) : null;
-      const actual  = row.actual_hours  !== null ? Number(row.actual_hours)  : null;
+      const planned  = row.planned_hours !== null ? Number(row.planned_hours) : null;
+      const actual   = row.actual_hours  !== null ? Number(row.actual_hours)  : null;
       const unitCost = Number(row.unit_cost);
       return {
-        ...row,
-        planned_hours: planned,
-        actual_hours:  actual,
-        unit_cost:     unitCost,
-        missingPlanned: isPastDeadline && planned === null,
-        planned_cost: planned !== null ? planned * unitCost : null,
-        actual_cost:  actual  !== null ? actual  * unitCost : null,
+        id:              row.id,
+        code:            row.code,
+        name:            row.name,
+        unit_cost:       unitCost,
+        section_id:      row.section_id ?? null,
+        section_name:    row.section_name ?? null,
+        department_id:   row.department_id ?? null,
+        department_name: row.department_name ?? null,
+        planned_hours:   planned,
+        actual_hours:    actual,
+        note:            row.note ?? null,
+        missingPlanned:  isPastDeadline && planned === null,
+        planned_cost:    planned !== null ? planned * unitCost : null,
+        actual_cost:     actual  !== null ? actual  * unitCost : null,
       };
     });
 
-    res.json({ year, month, deadline_day: deadlineDay, is_past_deadline: isPastDeadline, members });
+    // 部・課別集計を members から算出
+    const deptMap = new Map<number, {
+      department_id: number;
+      department_name: string;
+      member_count: number;
+      total_planned_hours: number;
+      total_actual_hours: number;
+      total_planned_cost: number;
+      total_actual_cost: number;
+      sectionMap: Map<number, SectionSummary>;
+    }>();
+
+    for (const m of members) {
+      if (!m.department_id) continue;
+      if (!deptMap.has(m.department_id)) {
+        deptMap.set(m.department_id, {
+          department_id:       m.department_id,
+          department_name:     m.department_name!,
+          member_count:        0,
+          total_planned_hours: 0,
+          total_actual_hours:  0,
+          total_planned_cost:  0,
+          total_actual_cost:   0,
+          sectionMap:          new Map(),
+        });
+      }
+      const dept = deptMap.get(m.department_id)!;
+      dept.member_count        += 1;
+      dept.total_planned_hours += m.planned_hours ?? 0;
+      dept.total_actual_hours  += m.actual_hours  ?? 0;
+      dept.total_planned_cost  += m.planned_cost  ?? 0;
+      dept.total_actual_cost   += m.actual_cost   ?? 0;
+
+      if (m.section_id) {
+        if (!dept.sectionMap.has(m.section_id)) {
+          dept.sectionMap.set(m.section_id, {
+            section_id:          m.section_id,
+            section_name:        m.section_name!,
+            member_count:        0,
+            total_planned_hours: 0,
+            total_actual_hours:  0,
+            total_planned_cost:  0,
+            total_actual_cost:   0,
+          });
+        }
+        const sec = dept.sectionMap.get(m.section_id)!;
+        sec.member_count        += 1;
+        sec.total_planned_hours += m.planned_hours ?? 0;
+        sec.total_actual_hours  += m.actual_hours  ?? 0;
+        sec.total_planned_cost  += m.planned_cost  ?? 0;
+        sec.total_actual_cost   += m.actual_cost   ?? 0;
+      }
+    }
+
+    const department_summary: DepartmentSummary[] = Array.from(deptMap.values()).map(d => ({
+      department_id:       d.department_id,
+      department_name:     d.department_name,
+      member_count:        d.member_count,
+      total_planned_hours: d.total_planned_hours,
+      total_actual_hours:  d.total_actual_hours,
+      total_planned_cost:  d.total_planned_cost,
+      total_actual_cost:   d.total_actual_cost,
+      sections:            Array.from(d.sectionMap.values()),
+    }));
+
+    res.json({ year, month, deadline_day: deadlineDay, is_past_deadline: isPastDeadline, members, department_summary });
   } catch (err) {
     next(err);
   }
