@@ -1,4 +1,7 @@
-import type { Member, MonthlyReport, AnnualReport, ConfigMap, ImportResult } from '../types';
+import type {
+  Member, MonthlyReport, AnnualReport, ConfigMap, ImportResult,
+  Department,
+} from '../types';
 
 const BASE = '/api/v1';
 
@@ -32,10 +35,10 @@ export const api = {
   getMembers: (activeOnly = false) =>
     req<Member[]>(`/members${activeOnly ? '?active=1' : ''}`),
 
-  createMember: (data: Pick<Member, 'code' | 'name' | 'unit_cost'>) =>
+  createMember: (data: Pick<Member, 'code' | 'name' | 'unit_cost'> & { section_id?: number | null }) =>
     req<Member>('/members', json('POST', data)),
 
-  updateMember: (id: number, data: Partial<Member>) =>
+  updateMember: (id: number, data: Partial<Pick<Member, 'code' | 'name' | 'unit_cost' | 'active'>> & { section_id?: number | null }) =>
     req<{ success: boolean }>(`/members/${id}`, json('PUT', data)),
 
   deleteMember: (id: number) =>
@@ -53,4 +56,28 @@ export const api = {
     form.append('file', file);
     return req<ImportResult>('/import/csv', { method: 'POST', body: form });
   },
+
+  /* ---------- Departments ---------- */
+  getDepartments: () => req<Department[]>('/departments'),
+
+  createDepartment: (name: string) =>
+    req<Department>('/departments', json('POST', { name })),
+
+  updateDepartment: (id: number, name: string) =>
+    req<{ success: boolean }>(`/departments/${id}`, json('PUT', { name })),
+
+  deleteDepartment: (id: number) =>
+    req<{ success: boolean }>(`/departments/${id}`, { method: 'DELETE' }),
+
+  /* ---------- Sections ---------- */
+  createSection: (department_id: number, name: string) =>
+    req<{ id: number; department_id: number; name: string }>(
+      '/departments/sections', json('POST', { department_id, name })
+    ),
+
+  updateSection: (id: number, name: string) =>
+    req<{ success: boolean }>(`/departments/sections/${id}`, json('PUT', { name })),
+
+  deleteSection: (id: number) =>
+    req<{ success: boolean }>(`/departments/sections/${id}`, { method: 'DELETE' }),
 };
