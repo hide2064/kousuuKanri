@@ -8,6 +8,8 @@ import workHoursRouter   from './routes/workHours';
 import reportsRouter     from './routes/reports';
 import importRouter      from './routes/import';
 import departmentsRouter from './routes/departments';
+import importDepartmentsRouter from './routes/importDepartments';
+import importMembersRouter     from './routes/importMembers';
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
@@ -21,6 +23,8 @@ app.use('/api/v1/work-hours',  workHoursRouter);
 app.use('/api/v1/reports',     reportsRouter);
 app.use('/api/v1/import',      importRouter);
 app.use('/api/v1/departments', departmentsRouter);
+app.use('/api/v1/import/departments', importDepartmentsRouter);
+app.use('/api/v1/import/members',     importMembersRouter);
 
 app.use(errorHandler);
 
