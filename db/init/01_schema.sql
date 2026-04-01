@@ -6,7 +6,8 @@ CREATE TABLE IF NOT EXISTS departments (
   id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   name       VARCHAR(100) NOT NULL,
   created_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  updated_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_department_name (name)
 );
 
 CREATE TABLE IF NOT EXISTS sections (
@@ -16,6 +17,7 @@ CREATE TABLE IF NOT EXISTS sections (
   created_at    DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at    DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   INDEX idx_sections_department_id (department_id),
+  UNIQUE KEY uq_section_dept_name (department_id, name),
   FOREIGN KEY (department_id) REFERENCES departments(id)
 );
 
