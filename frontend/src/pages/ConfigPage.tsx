@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
+import DepartmentsTab from '../components/DepartmentsTab';
+
+type Tab = 'config' | 'departments';
 
 const LABELS: Record<string, string> = {
   planned_hours_deadline_day: '予定工数締日（日）',
@@ -9,7 +12,7 @@ const LABELS: Record<string, string> = {
   company_name:              'システム名称',
 };
 
-export default function ConfigPage() {
+function SystemConfigTab() {
   const qc = useQueryClient();
   const [editKey,   setEditKey]   = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
@@ -36,9 +39,7 @@ export default function ConfigPage() {
   if (!config)   return null;
 
   return (
-    <div className="space-y-5 max-w-2xl">
-      <h2 className="text-xl font-bold text-gray-800">システム設定</h2>
-
+    <div className="space-y-4">
       <div className="card p-0 overflow-hidden">
         <table className="table-base">
           <thead>
@@ -77,9 +78,7 @@ export default function ConfigPage() {
                         className="btn-primary text-xs py-1 px-2"
                         disabled={updateMutation.isPending}
                         onClick={() => updateMutation.mutate({ key, value: editValue })}
-                      >
-                        保存
-                      </button>
+                      >保存</button>
                       <button className="btn-secondary text-xs py-1 px-2" onClick={() => setEditKey(null)}>
                         戻る
                       </button>
@@ -88,9 +87,7 @@ export default function ConfigPage() {
                     <button
                       className="btn-secondary text-xs py-1 px-2"
                       onClick={() => { setEditKey(key); setEditValue(entry.value); }}
-                    >
-                      編集
-                    </button>
+                    >編集</button>
                   )}
                 </td>
               </tr>
@@ -104,13 +101,11 @@ export default function ConfigPage() {
           「{LABELS[saved] ?? saved}」を保存しました。
         </div>
       )}
-
       {updateMutation.isError && (
         <div className="bg-red-50 border border-red-300 rounded-lg px-4 py-2 text-red-700 text-sm">
           エラー: {String(updateMutation.error)}
         </div>
       )}
-
       <div className="card bg-blue-50 border-blue-200 text-sm text-blue-800 space-y-1">
         <p className="font-semibold">設定値の説明</p>
         <ul className="list-disc list-inside space-y-0.5 text-xs">
@@ -118,6 +113,34 @@ export default function ConfigPage() {
           <li><strong>年度開始月：</strong>年次レポートの集計期間の開始月（例: 4 = 4月〜翌3月）。</li>
         </ul>
       </div>
+    </div>
+  );
+}
+
+export default function ConfigPage() {
+  const [tab, setTab] = useState<Tab>('config');
+
+  return (
+    <div className="space-y-5 max-w-2xl">
+      <h2 className="text-xl font-bold text-gray-800">システム設定</h2>
+
+      <div className="flex gap-1 border-b border-gray-200">
+        {([['config', 'システム設定'], ['departments', '部・課管理']] as [Tab, string][]).map(([t, label]) => (
+          <button
+            key={t}
+            className={`px-5 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+              tab === t
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+            onClick={() => setTab(t)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'config' ? <SystemConfigTab /> : <DepartmentsTab />}
     </div>
   );
 }
