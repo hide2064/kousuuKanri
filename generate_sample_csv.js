@@ -2,52 +2,33 @@
 /**
  * サンプルCSVファイル生成スクリプト
  * 生成対象:
- *   - members.csv         (インポート形式: member_code,member_name,unit_cost,department_name,section_name)
- *   - work_hours.csv      (インポート形式: member_code,year,month,type,hours,note / 2023-2025年 3年分)
+ *   - work_hours.csv  (複合フォーマット: member_code,year,month,planned_hours,actual_hours,note / 2023-2025年 3年分)
  *
- * departments_sections.csv は既存のものをそのまま使用
+ * members.csv / departments_sections.csv は既存のものをそのまま使用
  */
 
 const fs = require('fs');
 const path = require('path');
 
-// ─── セクションIDから部・課名へのマッピング ───────────────────────────────
-const SECTION_MAP = {
-  '1': { dept: 'テクノロジー本部', section: 'プラットフォーム開発課' },
-  '2': { dept: 'テクノロジー本部', section: 'SRE課' },
-  '3': { dept: 'テクノロジー本部', section: 'データ基盤課' },
-  '4': { dept: 'プロダクト本部',   section: 'プロダクトマネジメント課' },
-  '5': { dept: 'プロダクト本部',   section: 'UI/UXデザイン課' },
-  '6': { dept: 'ビジネス本部',     section: '営業企画課' },
-  '7': { dept: 'ビジネス本部',     section: 'マーケティング課' },
-};
-
-// ─── 既存 members.csv を読み込み ──────────────────────────────────────────
-// 形式: code,name,unit_cost,section_id,active
+// ─── members.csv を読み込み（インポート形式） ──────────────────────────────
+// 形式: member_code,member_name,unit_cost,department_name,section_name
 const rawMembers = fs.readFileSync(path.join(__dirname, 'members.csv'), 'utf8');
 const rawLines = rawMembers.trim().split('\n').slice(1); // ヘッダー除去
 
+// 非アクティブメンバー（元データで active=0 だったコード）
+const INACTIVE = new Set(['M035', 'M066', 'M099', 'M132', 'M171']);
+
 const members = rawLines
   .map(line => {
-    const [code, name, unit_cost, section_id, active] = line.split(',').map(s => s.trim());
-    return { code, name, unit_cost, section_id, active };
+    const parts = line.split(',').map(s => s.trim());
+    return { code: parts[0], name: parts[1] };
   })
-  .filter(m => m.code);
+  .filter(m => m.code && !INACTIVE.has(m.code));
 
-// ─── members.csv を書き出し（インポート形式） ──────────────────────────────
-{
-  const rows = ['member_code,member_name,unit_cost,department_name,section_name'];
-  for (const m of members) {
-    const map = SECTION_MAP[m.section_id] || { dept: '', section: '' };
-    rows.push(`${m.code},${m.name},${m.unit_cost},${map.dept},${map.section}`);
-  }
-  fs.writeFileSync(path.join(__dirname, 'members.csv'), rows.join('\n') + '\n', 'utf8');
-  console.log(`members.csv: ${rows.length - 1} 件`);
-}
+console.log(`members.csv: ${members.length} 件（アクティブのみ）`);
 
 // ─── work_hours.csv を生成 ─────────────────────────────────────────────────
-// アクティブメンバーのみ工数データを生成
-const activeMembers = members.filter(m => m.active === '1');
+const activeMembers = members;
 
 // 決定論的な擬似乱数 (xorshift32)
 let _seed = 0xDEADBEEF;
@@ -69,7 +50,8 @@ const NOTES = [
   '', '', '', '', '', '', '', '', '', '', // 空白が多め
 ];
 
-const wRows = ['member_code,year,month,type,hours,note'];
+// 複合フォーマット: 1行に予定・実績を同時に持つ
+const wRows = ['member_code,year,month,planned_hours,actual_hours,note'];
 
 for (let year = 2023; year <= 2025; year++) {
   for (let month = 1; month <= 12; month++) {
@@ -81,37 +63,27 @@ for (let year = 2023; year <= 2025; year++) {
       const baseHours = workDaysBase * 8;
 
       // 予定工数: ±10%の範囲で変動
-      const plannedVariance = randInt(-baseHours * 0.08 | 0, baseHours * 0.12 | 0);
+      const plannedVariance = randInt(-(baseHours * 0.08 | 0), baseHours * 0.12 | 0);
       const plannedHours = Math.max(100, baseHours + plannedVariance);
 
       // 実績工数: 予定 ±12% 程度
-      const actualVariance = randInt(-plannedHours * 0.10 | 0, plannedHours * 0.14 | 0);
+      const actualVariance = randInt(-(plannedHours * 0.10 | 0), plannedHours * 0.14 | 0);
       const actualHours = Math.max(80, plannedHours + actualVariance);
 
-      // 3%の確率で予定工数なし（締日前など）
-      const missingPlanned = rand() < 0.03;
-      // 3%の確率で実績工数なし
-      const missingActual = rand() < 0.03;
+      // 3%の確率で予定工数なし、3%の確率で実績工数なし
+      const plannedStr = rand() < 0.03 ? '' : String(plannedHours);
+      const actualStr  = rand() < 0.03 ? '' : (actualHours % 1 === 0 ? String(actualHours) : actualHours.toFixed(1));
 
-      // メモ: 20%の確率で付与
+      // メモ: 15%の確率で付与
       const noteIdx = randInt(0, NOTES.length - 1);
-      const note = rand() < 0.20 ? NOTES[noteIdx] : '';
+      const note = rand() < 0.15 ? NOTES[noteIdx] : '';
 
-      if (!missingPlanned) {
-        wRows.push(`${m.code},${year},${month},planned,${plannedHours},`);
-      }
-      if (!missingActual) {
-        const actualStr = (actualHours % 1 === 0)
-          ? actualHours.toString()
-          : actualHours.toFixed(1);
-        wRows.push(`${m.code},${year},${month},actual,${actualStr},${note}`);
-      }
+      wRows.push(`${m.code},${year},${month},${plannedStr},${actualStr},${note}`);
     }
   }
 }
 
 fs.writeFileSync(path.join(__dirname, 'work_hours.csv'), wRows.join('\n') + '\n', 'utf8');
 const totalRows = wRows.length - 1;
-const monthCount = 36;
-console.log(`work_hours.csv: ${totalRows} 件 (平均 ${Math.round(totalRows / monthCount)} 件/月)`);
+console.log(`work_hours.csv: ${totalRows} 件 (${Math.round(totalRows / 36)} 件/月)`);
 console.log('完了');
